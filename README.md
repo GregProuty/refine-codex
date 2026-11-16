@@ -1,23 +1,20 @@
-﻿# Refine for Codex
+﻿# Refine: Claude Code by default
 
-A Codex skill that hardens a spec, plan, or implementation through independent Codex CLI review rounds. The active Codex agent controls the loop and checks each finding; a fresh `codex exec` session produces each review. The original workflow, ledger, scripts, and stopping rules come from [Greg Prouty's refine-skill](https://github.com/GregProuty/refine-skill).
+Harden a spec, plan, or implementation through independent review rounds. Claude Code Opus is the default reviewer; Codex or Claude Code can act as the controller. The legacy Codex CLI reviewer remains available as a compatibility option.
 
 ## Requirements
 
-- Codex CLI, installed and authenticated, with a trusted project
+- Claude Code CLI (default reviewer) or Codex CLI (legacy reviewer)
+- Either Codex or Claude Code as the controller
 - Python 3, Git, and Bash (Git Bash on Windows)
-- A repository with a clean index and a committed subject
+- A repository with a clean index and committed subject
 
 ## Install
 
-Run `python install.py` from this repository to install into both Claude Code (`~/.claude/skills/refine`) and Codex (`$CODEX_HOME/skills/refine`, or `~/.codex/skills/refine`). Use `--target=claude` or `--target=codex` to select one host. The installer refuses to overwrite an existing installation; use `python install.py --update` to refresh it. Restart Codex if the skill does not appear immediately.
+Run `python install.py --update` to install into Claude Code (`~/.claude/skills/refine`) and Codex (`$CODEX_HOME/skills/refine`, or `~/.codex/skills/refine`).
 
 ## Use
 
-Ask Codex to use `$refine` on a committed spec, plan, or `<base>...HEAD` implementation range. For example: `Use $refine on docs/specs/my-feature.md --rounds 6`. The controller records each round in `docs/superpowers/reviews/<date>-<topic>/` and makes path-limited commits. See [SKILL.md](SKILL.md) for the full workflow.
+Invoke `$refine` from either Claude Code or Codex on a committed spec, plan, or `<base>...HEAD` implementation range. Claude Code Opus runs each review round by default. See [SKILL.md](SKILL.md) for the workflow and [bin/run-round-claude.py](bin/run-round-claude.py) for the Claude runner.
 
-On Windows, use `C:/Program Files/Git/bin/bash.exe` for the shell scripts. Run `python -m unittest discover -s tests -t .` to test the helper scripts. `probe.sh` checks Codex CLI JSON and schema support against a trusted worktree.
-
-## Credits and license
-
-Adapted from [refine-skill](https://github.com/GregProuty/refine-skill) by Greg Prouty. MIT license; see [LICENSE](LICENSE).
+Adapted from [Greg Prouty's refine-skill](https://github.com/GregProuty/refine-skill). MIT license; see [LICENSE](LICENSE).

@@ -22,7 +22,7 @@ def block(run_dir, n, status_line):
     u = usage(m)
     dur = f"{u['duration_s'] // 60}m{u['duration_s'] % 60:02d}s"
     tok = u["input_tokens"] + u["output_tokens"]   # §9: tok = input + output, repair included; cached shown for cost reading
-    out = [f"── /refine round {n}/{meta.get('cap', '10')} · {m.get('kind', '?')} {meta['topic']} · rev {m.get('head', '?')} · codex {dur} · "
+    out = [f"── /refine round {n}/{meta.get('cap', '10')} · {m.get('kind', '?')} {meta['topic']} · rev {m.get('head', '?')} · {m.get("reviewer", "codex")} {dur} · "
            f"{k(tok)} tok ({k(u['cached_input_tokens'])} cached) ──", f"Verdict  {d['verdict']}"]
     new = [r for r in rows if r["id"].startswith(f"R{n}-")]
     disp = lambda st: "accepted → fixed" if L.is_fixed(st) else st

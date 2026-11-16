@@ -1,13 +1,17 @@
 ---
 name: refine
-description: Use when the user asks to refine or harden a spec, plan, or implementation through repeated independent Codex CLI reviews, from Claude Code or Codex.
+description: Use when the user asks to refine or harden a spec, plan, or implementation through repeated independent Claude Code (Opus) reviews, controlled from Codex or Claude Code.
 ---
 
 # /refine
 
-You run a review loop from the current host, either Claude Code or Codex. The active host is the controller; a fresh independent Codex CLI session (`codex exec`) performs each review. Verify and answer every finding, fix what you accept, commit, and run the next round, until Codex has no remaining P0/P1 findings, a finding is contested, the round cap is reached, or Codex fails. The spec is `docs/design.md`; section numbers below refer to it. Announce "Using /refine" and keep the user informed with exactly one block per round (§9).
+You run a review loop from the current host, either Claude Code or Codex. The active host is the controller; a fresh independent Claude Code session (Opus) performs each review through `bin/run-round-claude.py`. Verify and answer every finding, fix what you accept, commit, and run the next round, until the reviewer has no remaining P0/P1 findings, a finding is contested, the round cap is reached, or the reviewer fails. The spec is `docs/design.md`; section numbers below refer to it. Announce "Using /refine" and keep the user informed with exactly one block per round (§9).
 
 `SKILL` below is this skill's directory (`~/.codex/skills/refine`, or `$CODEX_HOME/skills/refine`). On Windows, run shell scripts with Git Bash and convert the Windows run directory to a Git Bash path with `cygpath -u` before passing `--run-dir`; use the native Windows path for Python calls. `RUN` is the run dir. Read every script's output; do not guess. Output contract: `setup-run.py`, `assemble-prompt.py`, `parse-round.py`, `set-status.py`, `resume-position.py`, `render-exchange.py` and `round-summary.py --totals` print one JSON object; `round-summary.py --round N` prints the round block as display text; `run-round.sh` prints text (key=value meta on success, a diagnostic on failure); `commit-round.sh` prints the new short commit hash on success and a diagnostic on failure. Every script's exit code is meaningful and is handled where the step names it.
+
+## Local Claude launcher
+
+The default reviewer is Claude Code Opus; do not substitute Codex CLI. The controller stays in the current host. The Claude launcher permits only Read/Grep/Glob, disables hooks, slash commands and MCP tools, and requires successful structured output. Supply a prepared diff in the reading manifest when git inspection is needed. Retain failed attempt files; the launcher refuses to overwrite an existing round, so archive its output/meta/events under a numbered attempt before explicitly retrying. The legacy Codex shell launcher remains installed only for compatibility, not for this workflow.
 
 ## Hard rules
 
@@ -15,7 +19,7 @@ You run a review loop from the current host, either Claude Code or Codex. The ac
 - Every finding is verified against the subject and the code before it is accepted or rejected. Follow the installed `superpowers:receiving-code-review` skill when available. No "you're right"; state what you checked.
 - You never edit a file that is listed in `RUN/dirty-baseline`. If a fix needs one, stop with BLOCKED PATH (§8); once the user has committed or moved that work aside, `resume-position.py` releases the path (it prints it under `released`) and the fix can proceed.
 - P2/P3 never keep the loop running. P0/P1 are never `deferred`.
-- One fresh Codex review session per round; the only additional Codex invocation allowed in a round is the single semantic-repair continuation of step 2. A round that fails is re-run, never patched by hand.
+- One fresh Claude Code review session per round; the only additional Claude Code invocation allowed in a round is the single semantic-repair continuation of step 2. A round that fails is re-run, never patched by hand.
 - For long-running `run-round.sh` commands, report `round N running` once, wait for completion, and inspect the result. Use the available terminal session mechanism; background notification is optional.
 
 ## Arguments
@@ -46,21 +50,21 @@ You run a review loop from the current host, either Claude Code or Codex. The ac
 
 Round kinds: `full` for round 1, `delta` after, `confirm` when resume-position says so.
 
-1. **Run Codex** (long-running; effort is chosen by the script per §3, except that when any ledger row has a `fixed:*` status with `cycles >= 2` (a fix Codex found incomplete twice, which you fixed again in the previous round) you pass `--effort <the run.meta effort>` so the round runs at round-1 effort, §6):
+1. **Run Claude Code** (long-running; effort is chosen by the script per §3, except that when any ledger row has a `fixed:*` status with `cycles >= 2` (a fix the reviewer found incomplete twice, which you fixed again in the previous round) you pass `--effort <the run.meta effort>` so the round runs at round-1 effort, §6):
    ```
-   bash "$SKILL/bin/run-round.sh" --run-dir $RUN --round N --kind full|delta|confirm [--effort high]
+   python "$SKILL/bin/run-round-claude.py" --run-dir $RUN --round N --kind full|delta|confirm [--effort high]
    ```
-   Say `round N running` and wait. Exit 1 is CODEX FAILURE (§8): print its diagnostic (it names a usage limit and the reset time when that is the cause), then the final summary, then stop. The attempt is preserved; a resume re-runs the same round.
+   Say `round N running` and wait. Exit 1 is CLAUDE FAILURE (§8): print its diagnostic (it names a usage limit and the reset time when that is the cause), then the final summary, then stop. The attempt is preserved; a resume re-runs the same round.
 2. **Parse** (it reads the ledger as committed at HEAD, so re-running it is safe until a step-3 or step-4 decision has been recorded):
    ```
    python3 "$SKILL/bin/parse-round.py" --run-dir $RUN --round N --kind full|delta|confirm
    ```
-   Exit 2 prints `{"violations": [...]}`. If `RUN/round-N.meta` already has a `repair_exit` line, a repair was used on this output: this is the second violation, CODEX FAILURE (§8), stop. Otherwise repair once with the violations joined by `; `:
+   Exit 2 prints `{"violations": [...]}`. If `RUN/round-N.meta` already has a `repair_exit` line, a repair was used on this output: this is the second violation, CLAUDE FAILURE (§8), stop. Otherwise repair once with the violations joined by `; `:
    ```
-   bash "$SKILL/bin/run-round.sh" --run-dir $RUN --round N --kind <kind> --repair "<violations>"
+   python "$SKILL/bin/run-round-claude.py" --run-dir $RUN --round N --kind <kind> --repair "<violations>"
    ```
-   If the repair call exits 1 (`REPAIR FAILED`), that is CODEX FAILURE (§8): print its diagnostic and the final summary and stop; the failed repair is preserved as an attempt and the live meta is restored, so a resume re-runs the round. Otherwise parse again. Exit 0 prints `new`, `transitions`, `needs_judgment`, `contested`.
-3. **Judge new evidence** for every ID in `needs_judgment` (a rejected row Codex re-raised, or a decided row re-raised in a confirm pass): does its note cite a file:line or subject line not cited before, or answer your rejection rationale directly? If not, contest it now:
+   If the repair call exits 1 (`REPAIR FAILED`), that is CLAUDE FAILURE (§8): print its diagnostic and the final summary and stop; the failed repair is preserved as an attempt and the live meta is restored, so a resume re-runs the round. Otherwise parse again. Exit 0 prints `new`, `transitions`, `needs_judgment`, `contested`.
+3. **Judge new evidence** for every ID in `needs_judgment` (a rejected row the reviewer re-raised, or a decided row re-raised in a confirm pass): does its note cite a file:line or subject line not cited before, or answer your rejection rationale directly? If not, contest it now:
    ```
    python3 "$SKILL/bin/set-status.py" --run-dir $RUN --id <id> --status contested --append-note "no new evidence"
    ```
@@ -91,7 +95,7 @@ Round kinds: `full` for round 1, `delta` after, `confirm` when resume-position s
    ```
 8. **Evaluate** `python3 "$SKILL/bin/resume-position.py" --run-dir $RUN` (it also refreshes the dirty baseline and prints `released`) and act on `outcome`:
    - `CONTINUE`: next round, kind `delta`. `CONFIRM`: next round, kind `confirm` (only once per run).
-   - `CONTESTED` (a disagreement: you rejected and Codex re-raised without new evidence or twice, or a fix missed three times): print each contested row as two positions with citations (Codex's claim and latest note; your rejection or fix and why), your recommendation per ID, and the ruling options `accept | reject | stop`. Print the final summary. Stop and wait for the user. `stop` means no ruling: leave the contested statuses as they are, write no ruling file and make no commit, start no round; the run stays resumable with the printed `/refine --resume` command and will ask for the ruling again.
+   - `CONTESTED` (a disagreement: you rejected and the reviewer re-raised without new evidence or twice, or a fix missed three times): print each contested row as two positions with citations (the reviewer's claim and latest note; your rejection or fix and why), your recommendation per ID, and the ruling options `accept | reject | stop`. Print the final summary. Stop and wait for the user. `stop` means no ruling: leave the contested statuses as they are, write no ruling file and make no commit, start no round; the run stays resumable with the printed `/refine --resume` command and will ask for the ruling again.
    - `CONVERGED` or `CAP`: print the final summary. Stop.
 
 ## Ruling (§8 CONTESTED)
@@ -117,7 +121,7 @@ When the user rules, in this order:
 - `commit-ruling`: the ruling file is complete; do Ruling steps 4 to 6.
 - `stop`: print the final summary.
 - `assemble`: Round N step 1 as written (the normal `run-round.sh` call assembles the prompt).
-- `run`: the prompt exists and must be re-sent exactly: `bash "$SKILL/bin/run-round.sh" --run-dir $RUN --round <next_round> --kind <next_kind> --no-assemble` (plus `--effort <run.meta effort>` under the step-1 bump rule), run with step 1's `round N running` announcement and step 1's exit handling (exit 1 is CODEX FAILURE: diagnostic, final summary, stop); on exit 0 continue at step 2. This is also where a round lands after its one repair failed semantics again.
+- `run`: the prompt exists and must be re-sent exactly: `python "$SKILL/bin/run-round-claude.py" --run-dir $RUN --round <next_round> --kind <next_kind> --no-assemble` (plus `--effort <run.meta effort>` under the step-1 bump rule), run with step 1's `round N running` announcement and step 1's exit handling (exit 1 is CLAUDE FAILURE: diagnostic, final summary, stop); on exit 0 continue at step 2. This is also where a round lands after its one repair failed semantics again.
 - `parse`: Round N step 2.
 - `respond`: parse is done. First do step 3 for exactly the IDs in the `needs_judgment` line of `RUN/round-<next_round>.meta` (parse-round.py records them there; do not re-run parse and do not reconstruct the list from statuses: a fixed row reopened after a miss is `open` too but needs no judgment). Then step 4, re-verifying every `open` and `reopened` row against the current tree; fixes may be partly applied.
 - `verify-commit`: steps 5 to 8.
@@ -125,4 +129,4 @@ If it printed `released` paths, say so: those files were blocked and are now edi
 
 ## Final summary
 
-On every stop: `python3 "$SKILL/bin/round-summary.py" --run-dir $RUN --totals` gives the numbers (rounds, failed attempts, wall time, tokens over every round and attempt meta with repair turns included, findings by status). Print: outcome; those numbers; the contested block if any (Codex's claim and latest note, your position, both cited); the deferred list; the commit range (`git log --oneline -- $RUN`); whether a confirm pass ran; and for CONTESTED, CODEX FAILURE or BLOCKED PATH the exact resume command with absolute paths: `/refine --resume <absolute run dir>`.
+On every stop: `python3 "$SKILL/bin/round-summary.py" --run-dir $RUN --totals` gives the numbers (rounds, failed attempts, wall time, tokens over every round and attempt meta with repair turns included, findings by status). Print: outcome; those numbers; the contested block if any (the reviewer's claim and latest note, your position, both cited); the deferred list; the commit range (`git log --oneline -- $RUN`); whether a confirm pass ran; and for CONTESTED, CLAUDE FAILURE or BLOCKED PATH the exact resume command with absolute paths: `/refine --resume <absolute run dir>`.

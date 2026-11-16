@@ -64,7 +64,7 @@ def build(run_dir, n, kind):
     meta = L.read_kv(os.path.join(run_dir, "run.meta"))
     wt, subjects, skind = meta["worktree"], meta["subject"].split(), meta["subject_kind"]
     if skind == "impl":   # the current range, so files a fix added or first edited are subjects too (R1-F5); deleted files stay listed
-        try: subjects = L.git(wt, "diff", "--name-only", f"{meta.get('base', 'main')}...HEAD", "--", ".", ":!docs/superpowers/reviews").split() or subjects
+        try: subjects = list(dict.fromkeys(subjects + L.git(wt, "diff", "--name-only", f"{meta.get('head_at_setup', meta.get('base', 'main'))}...HEAD", "--", ".", ":!docs/superpowers/reviews").split()))
         except subprocess.CalledProcessError: pass   # base ref unavailable: keep the setup-time list
     brief = _read(os.path.join(run_dir, "brief.md"))
     if kind == "full":
