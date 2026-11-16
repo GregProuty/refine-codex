@@ -1,11 +1,11 @@
 ---
 name: refine
-description: Use when the user asks to refine or harden a spec, plan, or implementation through repeated independent Codex CLI reviews.
+description: Use when the user asks to refine or harden a spec, plan, or implementation through repeated independent Codex CLI reviews, from Claude Code or Codex.
 ---
 
 # /refine
 
-You run a review loop: an independent fresh Codex CLI session (`codex exec`) reviews the subject, while you act as the controller. Verify and answer every finding, fix what you accept, commit, and run the next round, until Codex has no remaining P0/P1 findings, a finding is contested, the round cap is reached, or Codex fails. The spec is `docs/design.md`; section numbers below refer to it. Announce "Using /refine" and keep the user informed with exactly one block per round (§9).
+You run a review loop from the current host, either Claude Code or Codex. The active host is the controller; a fresh independent Codex CLI session (`codex exec`) performs each review. Verify and answer every finding, fix what you accept, commit, and run the next round, until Codex has no remaining P0/P1 findings, a finding is contested, the round cap is reached, or Codex fails. The spec is `docs/design.md`; section numbers below refer to it. Announce "Using /refine" and keep the user informed with exactly one block per round (§9).
 
 `SKILL` below is this skill's directory (`~/.codex/skills/refine`, or `$CODEX_HOME/skills/refine`). On Windows, run shell scripts with Git Bash and convert the Windows run directory to a Git Bash path with `cygpath -u` before passing `--run-dir`; use the native Windows path for Python calls. `RUN` is the run dir. Read every script's output; do not guess. Output contract: `setup-run.py`, `assemble-prompt.py`, `parse-round.py`, `set-status.py`, `resume-position.py`, `render-exchange.py` and `round-summary.py --totals` print one JSON object; `round-summary.py --round N` prints the round block as display text; `run-round.sh` prints text (key=value meta on success, a diagnostic on failure); `commit-round.sh` prints the new short commit hash on success and a diagnostic on failure. Every script's exit code is meaningful and is handled where the step names it.
 

@@ -10,7 +10,7 @@ A Codex skill that hardens a spec, plan, or implementation through independent C
 
 ## Install
 
-Run `python install.py` from this repository. This copies the skill to `$CODEX_HOME/skills/refine`, or `~/.codex/skills/refine` when `CODEX_HOME` is unset. The installer refuses to overwrite an existing installation; use `python install.py --update` to refresh it. Restart Codex if the skill does not appear immediately.
+Run `python install.py` from this repository to install into both Claude Code (`~/.claude/skills/refine`) and Codex (`$CODEX_HOME/skills/refine`, or `~/.codex/skills/refine`). Use `--target=claude` or `--target=codex` to select one host. The installer refuses to overwrite an existing installation; use `python install.py --update` to refresh it. Restart Codex if the skill does not appear immediately.
 
 ## Use
 
